@@ -1,0 +1,485 @@
+// 交通事故责任判定算法模块
+class ResponsibilityAnalyzer {
+    constructor() {
+        // 初始化责任规则库
+        this.responsibilityRules = this.initializeRules();
+        
+        // 权重配置
+        this.weights = {
+            trafficSignalViolation: 0.35, // 交通信号违规权重
+            speeding: 0.25,              // 超速权重
+            driverCondition: 0.20,       // 驾驶员状态权重
+            roadCondition: 0.10,         // 道路状况权重
+            weatherCondition: 0.10       // 天气状况权重
+        };
+    }
+    
+    // 初始化责任判定规则库
+    initializeRules() {
+        return {
+            // 交通信号相关规则
+            trafficSignals: {
+                'red-light': {
+                    responsibility: 0.8,  // 闯红灯承担80%责任
+                    description: '违反交通信号灯指示通行'
+                },
+                'yellow-light': {
+                    responsibility: 0.5,  // 抢黄灯承担50%责任
+                    description: '闯黄灯通行'
+                },
+                'no-signal': {
+                    responsibility: 0.3,  // 无信号灯路口责任较轻
+                    description: '无交通信号灯控制路口'
+                },
+                'signal-malfunction': {
+                    responsibility: 0.2,  // 信号灯故障责任较轻
+                    description: '交通信号灯故障'
+                }
+            },
+            
+            // 驾驶员状态相关规则
+            driverCondition: {
+                'intoxicated': {
+                    responsibility: 0.9,  // 酒驾/醉驾承担90%责任
+                    description: '酒后驾驶或醉酒驾驶'
+                },
+                'fatigued': {
+                    responsibility: 0.7,  // 疲劳驾驶承担70%责任
+                    description: '疲劳驾驶'
+                },
+                'distracted': {
+                    responsibility: 0.6,  // 分心驾驶承担60%责任
+                    description: '驾驶时分心（如使用手机）'
+                },
+                'normal': {
+                    responsibility: 0.2,  // 正常状态责任较轻
+                    description: '驾驶员状态正常'
+                }
+            },
+            
+            // 事故类型相关规则
+            accidentType: {
+                'rear-end': {
+                    followingVehicle: 0.8,  // 追尾事故后车承担80%责任
+                    description: '追尾事故中，后车未保持安全距离'
+                },
+                'side': {
+                    mainResponsibility: 0.7, // 侧面碰撞主要责任方承担70%
+                    description: '未让行右侧来车'
+                },
+                'head-on': {
+                    oppositeLane: 0.9,  // 逆向行驶承担90%责任
+                    description: '逆向行驶导致正面碰撞'
+                },
+                'pedestrian': {
+                    driver: 0.6,  // 行人事故驾驶员承担60%责任
+                    description: '未避让行人'
+                }
+            }
+        };
+    }
+    
+    // 分析事故责任
+    analyzeResponsibility(accidentData) {
+        try {
+            // 验证必要数据
+            if (!this.validateAccidentData(accidentData)) {
+                return this.createErrorResult('缺少必要的事故信息，请完整填写表单');
+            }
+            
+            let analysisResult = {
+                mainResponsible: '未确定',
+                secondaryResponsible: '未确定',
+                responsibilityRatio: '0:0',
+                judgmentReason: [],
+                confidence: 0,
+                detailedScores: {}
+            };
+            
+            // 1. 根据事故类型进行初步判定
+            const typeBasedAnalysis = this.analyzeByAccidentType(accidentData);
+            analysisResult.detailedScores.type = typeBasedAnalysis.score;
+            analysisResult.judgmentReason.push(typeBasedAnalysis.reason);
+            
+            // 2. 分析交通信号违规情况
+            const signalAnalysis = this.analyzeTrafficSignals(accidentData);
+            analysisResult.detailedScores.signal = signalAnalysis.score;
+            if (signalAnalysis.reason) {
+                analysisResult.judgmentReason.push(signalAnalysis.reason);
+            }
+            
+            // 3. 分析超速情况
+            const speedAnalysis = this.analyzeSpeeding(accidentData);
+            analysisResult.detailedScores.speed = speedAnalysis.score;
+            if (speedAnalysis.reason) {
+                analysisResult.judgmentReason.push(speedAnalysis.reason);
+            }
+            
+            // 4. 分析驾驶员状态
+            const driverAnalysis = this.analyzeDriverCondition(accidentData);
+            analysisResult.detailedScores.driver = driverAnalysis.score;
+            if (driverAnalysis.reason) {
+                analysisResult.judgmentReason.push(driverAnalysis.reason);
+            }
+            
+            // 5. 综合计算责任比例
+            const finalResult = this.calculateFinalResponsibility(accidentData, analysisResult);
+            
+            // 6. 生成判定理由
+            finalResult.judgmentReason = this.generateJudgmentReason(accidentData, finalResult);
+            
+            return finalResult;
+            
+        } catch (error) {
+            console.error('责任分析过程中出错:', error);
+            return this.createErrorResult('责任分析过程中出现错误，请检查输入数据');
+        }
+    }
+    
+    // 验证事故数据
+    validateAccidentData(data) {
+        if (!data) return false;
+        
+        // 检查必要字段
+        const requiredFields = ['accidentType', 'roadCondition', 'weatherCondition', 'trafficSignals', 'driverCondition'];
+        
+        for (const field of requiredFields) {
+            if (!data[field] || data[field] === '') {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    // 根据事故类型分析责任
+    analyzeByAccidentType(accidentData) {
+        const accidentType = accidentData.accidentType;
+        const rules = this.responsibilityRules.accidentType[accidentType];
+        
+        if (!rules) {
+            return { score: 0.5, reason: '事故类型不明确，需要进一步分析' };
+        }
+        
+        let score = 0;
+        let reason = rules.description;
+        
+        switch(accidentType) {
+            case 'rear-end':
+                // 追尾事故：后车通常承担主要责任
+                score = 0.8; // 假设后车是主要责任方
+                reason = '追尾事故中，后车未保持安全距离，违反《道路交通安全法》第四十三条规定';
+                break;
+                
+            case 'side':
+                // 侧面碰撞：根据是否有让行标志、是否闯红灯等因素判定
+                if (accidentData.trafficSignals === 'red-light') {
+                    score = 0.9;
+                    reason = '闯红灯导致侧面碰撞，应承担主要责任';
+                } else {
+                    score = 0.7;
+                    reason = '未按规定让行，违反《道路交通安全法实施条例》第五十二条规定';
+                }
+                break;
+                
+            case 'head-on':
+                // 正面碰撞：逆向行驶通常承担主要责任
+                score = 0.9;
+                reason = '逆向行驶导致正面碰撞，违反《道路交通安全法》第三十五条规定';
+                break;
+                
+            case 'pedestrian':
+                // 行人事故：根据行人是否在斑马线上、是否闯红灯等判定
+                if (accidentData.trafficSignals === 'red-light') {
+                    score = 0.4; // 行人闯红灯，驾驶员责任较轻
+                    reason = '行人闯红灯，但驾驶员仍应注意观察避让';
+                } else {
+                    score = 0.7;
+                    reason = '未避让行人，违反《道路交通安全法》第四十七条规定';
+                }
+                break;
+                
+            default:
+                score = 0.5;
+                reason = '需要根据具体情况进一步分析';
+        }
+        
+        return { score, reason };
+    }
+    
+    // 分析交通信号违规情况
+    analyzeTrafficSignals(accidentData) {
+        const signalType = accidentData.trafficSignals;
+        const rules = this.responsibilityRules.trafficSignals[signalType];
+        
+        if (!rules) {
+            return { score: 0, reason: '' };
+        }
+        
+        let score = rules.responsibility * this.weights.trafficSignalViolation;
+        let reason = '';
+        
+        if (signalType === 'red-light') {
+            reason = `违反交通信号灯指示，闯红灯通行，违反《道路交通安全法》第三十八条规定`;
+        } else if (signalType === 'yellow-light') {
+            reason = `闯黄灯通行，根据路口情况应停车等待`;
+        }
+        
+        return { score, reason };
+    }
+    
+    // 分析超速情况
+    analyzeSpeeding(accidentData) {
+        const speedLimit = accidentData.speedLimit || 0;
+        const vehicleSpeed = accidentData.vehicleSpeed || 0;
+        
+        if (!speedLimit || !vehicleSpeed) {
+            return { score: 0, reason: '' };
+        }
+        
+        const excessRatio = (vehicleSpeed - speedLimit) / speedLimit;
+        let score = 0;
+        let reason = '';
+        
+        if (excessRatio > 0) {
+            if (excessRatio <= 0.2) { // 超速20%以内
+                score = 0.3 * this.weights.speeding;
+                reason = `超速行驶，超过限速${Math.round(excessRatio * 100)}%`;
+            } else if (excessRatio <= 0.5) { // 超速20%-50%
+                score = 0.5 * this.weights.speeding;
+                reason = `严重超速，超过限速${Math.round(excessRatio * 100)}%，违反《道路交通安全法》第四十二条规定`;
+            } else { // 超速50%以上
+                score = 0.8 * this.weights.speeding;
+                reason = `极度超速，超过限速${Math.round(excessRatio * 100)}%，严重违反道路交通安全法规`;
+            }
+        }
+        
+        return { score, reason };
+    }
+    
+    // 分析驾驶员状态
+    analyzeDriverCondition(accidentData) {
+        const conditionType = accidentData.driverCondition;
+        const rules = this.responsibilityRules.driverCondition[conditionType];
+        
+        if (!rules) {
+            return { score: 0, reason: '' };
+        }
+        
+        let score = rules.responsibility * this.weights.driverCondition;
+        let reason = rules.description;
+        
+        if (conditionType === 'intoxicated') {
+            reason = `酒后驾驶或醉酒驾驶，违反《道路交通安全法》第二十二条第二款规定，属于严重违法行为`;
+        } else if (conditionType === 'fatigued') {
+            reason = `疲劳驾驶，违反《道路交通安全法》第二十二条第二款规定`;
+        } else if (conditionType === 'distracted') {
+            reason = `驾驶时分心，影响安全驾驶`;
+        }
+        
+        return { score, reason };
+    }
+    
+    // 计算最终责任比例
+    calculateFinalResponsibility(accidentData, analysisResult) {
+        const scores = analysisResult.detailedScores;
+        
+        // 计算总责任分数
+        let totalScore = 0;
+        let scoreCount = 0;
+        
+        for (const key in scores) {
+            if (scores[key] > 0) {
+                totalScore += scores[key];
+                scoreCount++;
+            }
+        }
+        
+        // 计算平均责任分数
+        const avgScore = scoreCount > 0 ? totalScore / scoreCount : 0.5;
+        
+        // 根据事故类型确定责任方
+        let mainResponsible, secondaryResponsible, ratio;
+        
+        switch(accidentData.accidentType) {
+            case 'rear-end':
+                mainResponsible = '后车';
+                secondaryResponsible = '前车';
+                // 根据分数调整责任比例
+                if (avgScore > 0.7) ratio = '90:10';
+                else if (avgScore > 0.5) ratio = '80:20';
+                else ratio = '70:30';
+                break;
+                
+            case 'side':
+                // 假设闯红灯方是主要责任方
+                if (accidentData.trafficSignals === 'red-light') {
+                    mainResponsible = '闯红灯车辆';
+                    secondaryResponsible = '正常通行车辆';
+                    ratio = '90:10';
+                } else {
+                    mainResponsible = '未让行车辆';
+                    secondaryResponsible = '被撞车辆';
+                    if (avgScore > 0.6) ratio = '70:30';
+                    else ratio = '60:40';
+                }
+                break;
+                
+            case 'head-on':
+                mainResponsible = '逆向行驶车辆';
+                secondaryResponsible = '正常行驶车辆';
+                ratio = '90:10';
+                break;
+                
+            case 'pedestrian':
+                if (accidentData.trafficSignals === 'red-light') {
+                    mainResponsible = '行人';
+                    secondaryResponsible = '车辆';
+                    ratio = '60:40';
+                } else {
+                    mainResponsible = '车辆';
+                    secondaryResponsible = '行人';
+                    if (avgScore > 0.6) ratio = '70:30';
+                    else ratio = '60:40';
+                }
+                break;
+                
+            default:
+                mainResponsible = '车辆A';
+                secondaryResponsible = '车辆B';
+                if (avgScore > 0.6) ratio = '70:30';
+                else if (avgScore > 0.4) ratio = '50:50';
+                else ratio = '30:70';
+        }
+        
+        // 特殊情况处理：酒驾、醉驾
+        if (accidentData.driverCondition === 'intoxicated') {
+            mainResponsible = '酒驾/醉驾方';
+            ratio = '100:0';
+        }
+        
+        analysisResult.mainResponsible = mainResponsible;
+        analysisResult.secondaryResponsible = secondaryResponsible;
+        analysisResult.responsibilityRatio = ratio;
+        analysisResult.confidence = Math.min(0.95, Math.max(0.7, avgScore));
+        
+        return analysisResult;
+    }
+    
+    // 生成判定理由
+    generateJudgmentReason(accidentData, result) {
+        const reasons = [];
+        
+        // 添加事故基本情况
+        reasons.push(`事故类型：${this.getAccidentTypeName(accidentData.accidentType)}`);
+        reasons.push(`道路状况：${this.getRoadConditionName(accidentData.roadCondition)}`);
+        reasons.push(`天气状况：${this.getWeatherConditionName(accidentData.weatherCondition)}`);
+        
+        // 添加责任判定核心理由
+        if (accidentData.driverCondition === 'intoxicated') {
+            reasons.push('驾驶员存在酒驾/醉驾行为，严重违反道路交通安全法规，应承担全部责任');
+        } else if (accidentData.trafficSignals === 'red-light') {
+            reasons.push('违反交通信号灯指示通行，是导致事故的主要原因');
+        } else {
+            switch(accidentData.accidentType) {
+                case 'rear-end':
+                    reasons.push('追尾事故中，后车未保持安全距离，违反《道路交通安全法》第四十三条规定');
+                    break;
+                case 'side':
+                    reasons.push('未按规定让行，违反《道路交通安全法实施条例》第五十二条规定');
+                    break;
+                case 'head-on':
+                    reasons.push('逆向行驶导致正面碰撞，违反《道路交通安全法》第三十五条规定');
+                    break;
+                case 'pedestrian':
+                    reasons.push('未避让行人，违反《道路交通安全法》第四十七条规定');
+                    break;
+            }
+        }
+        
+        // 添加超速情况
+        if (accidentData.speedLimit && accidentData.vehicleSpeed) {
+            const excessRatio = (accidentData.vehicleSpeed - accidentData.speedLimit) / accidentData.speedLimit;
+            if (excessRatio > 0) {
+                reasons.push(`车辆超速${Math.round(excessRatio * 100)}%，增加了事故风险和严重程度`);
+            }
+        }
+        
+        // 添加最终结论
+        reasons.push(`根据分析，${result.mainResponsible}应承担主要责任，责任比例约为${result.responsibilityRatio}`);
+        reasons.push('注：本分析结果仅供参考，最终责任认定以交警部门出具的事故认定书为准');
+        
+        return reasons;
+    }
+    
+    // 获取事故类型名称
+    getAccidentTypeName(type) {
+        const typeNames = {
+            'rear-end': '追尾事故',
+            'side': '侧面碰撞',
+            'head-on': '正面碰撞',
+            'pedestrian': '行人事故',
+            'other': '其他类型事故'
+        };
+        return typeNames[type] || type;
+    }
+    
+    // 获取道路状况名称
+    getRoadConditionName(condition) {
+        const conditionNames = {
+            'dry': '干燥',
+            'wet': '潮湿',
+            'snowy': '积雪',
+            'icy': '结冰',
+            'muddy': '泥泞'
+        };
+        return conditionNames[condition] || condition;
+    }
+    
+    // 获取天气状况名称
+    getWeatherConditionName(weather) {
+        const weatherNames = {
+            'sunny': '晴天',
+            'rainy': '雨天',
+            'foggy': '雾天',
+            'snowy': '雪天',
+            'dark': '夜间无照明'
+        };
+        return weatherNames[weather] || weather;
+    }
+    
+    // 创建错误结果
+    createErrorResult(message) {
+        return {
+            mainResponsible: '无法确定',
+            secondaryResponsible: '无法确定',
+            responsibilityRatio: '0:0',
+            judgmentReason: [message],
+            confidence: 0,
+            isError: true
+        };
+    }
+    
+    // 生成可视化数据
+    generateChartData(result) {
+        if (result.isError) {
+            return {
+                labels: ['错误'],
+                datasets: [{
+                    data: [100],
+                    backgroundColor: ['#e74c3c']
+                }]
+            };
+        }
+        
+        const [mainRatio, secondaryRatio] = result.responsibilityRatio.split(':').map(Number);
+        
+        return {
+            labels: [result.mainResponsible, result.secondaryResponsible],
+            datasets: [{
+                data: [mainRatio, secondaryRatio],
+                backgroundColor: ['#e74c3c', '#3498db']
+            }]
+        };
+    }
+}

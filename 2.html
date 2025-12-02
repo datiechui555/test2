@@ -1,0 +1,1114 @@
+// 3D事故模拟工具函数
+
+/**
+ * 工具函数集合，为事故模拟提供各种辅助功能
+ */
+const SimulationUtils = {
+    /**
+     * 生成随机颜色
+     * @returns {number} 十六进制颜色值
+     */
+    getRandomColor: function() {
+        return Math.floor(Math.random() * 0xffffff);
+    },
+    
+    /**
+     * 将角度转换为弧度
+     * @param {number} degrees 角度值
+     * @returns {number} 弧度值
+     */
+    degreesToRadians: function(degrees) {
+        return degrees * Math.PI / 180;
+    },
+    
+    /**
+     * 将弧度转换为角度
+     * @param {number} radians 弧度值
+     * @returns {number} 角度值
+     */
+    radiansToDegrees: function(radians) {
+        return radians * 180 / Math.PI;
+    },
+    
+    /**
+     * 计算两点之间的距离
+     * @param {Object} point1 第一个点 {x, y, z}
+     * @param {Object} point2 第二个点 {x, y, z}
+     * @returns {number} 距离值
+     */
+    calculateDistance: function(point1, point2) {
+        const dx = point2.x - point1.x;
+        const dy = point2.y - point1.y;
+        const dz = point2.z - point1.z;
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    },
+    
+    /**
+     * 限制值在指定范围内
+     * @param {number} value 输入值
+     * @param {number} min 最小值
+     * @param {number} max 最大值
+     * @returns {number} 限制后的值
+     */
+    clamp: function(value, min, max) {
+        return Math.min(Math.max(value, min), max);
+    },
+    
+    /**
+     * 生成车辆模型
+     * @param {THREE.Scene} scene 场景对象
+     * @param {Object} options 车辆选项
+     * @returns {THREE.Group} 车辆组对象
+     */
+    createVehicleModel: function(scene, options = {}) {
+        const group = new THREE.Group();
+        const type = options.type || 'car';
+        const color = options.color || 0xff0000;
+        
+        // 创建材质
+        const material = new THREE.MeshLambertMaterial({ color: color });
+        
+        // 根据车辆类型创建不同的模型
+        if (type === 'car') {
+            // 创建车身
+            const bodyGeometry = new THREE.BoxGeometry(2, 0.5, 1);
+            const body = new THREE.Mesh(bodyGeometry, material);
+            body.position.y = 0.5;
+            group.add(body);
+            
+            // 创建车顶
+            const roofGeometry = new THREE.BoxGeometry(1.2, 0.3, 0.8);
+            const roof = new THREE.Mesh(roofGeometry, material);
+            roof.position.set(0, 1.15, 0);
+            group.add(roof);
+            
+            // 创建车轮
+            const wheelMaterial = new THREE.MeshLambertMaterial({ color: 0x000000 });
+            const wheelGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.15);
+            
+            // 左前车轮
+            const wheelFL = new THREE.Mesh(wheelGeometry, wheelMaterial);
+            wheelFL.position.set(0.8, 0.25, 0.6);
+            wheelFL.rotation.z = Math.PI / 2;
+            group.add(wheelFL);
+            
+            // 右前车轮
+            const wheelFR = new THREE.Mesh(wheelGeometry, wheelMaterial);
+            wheelFR.position.set(0.8, 0.25, -0.6);
+            wheelFR.rotation.z = Math.PI / 2;
+            group.add(wheelFR);
+            
+            // 左后车轮
+            const wheelRL = new THREE.Mesh(wheelGeometry, wheelMaterial);
+            wheelRL.position.set(-0.8, 0.25, 0.6);
+            wheelRL.rotation.z = Math.PI / 2;
+            group.add(wheelRL);
+            
+            // 右后车轮
+            const wheelRR = new THREE.Mesh(wheelGeometry, wheelMaterial);
+            wheelRR.position.set(-0.8, 0.25, -0.6);
+            wheelRR.rotation.z = Math.PI / 2;
+            group.add(wheelRR);
+        } else if (type === 'truck') {
+            // 创建卡车底盘
+            const chassisGeometry = new THREE.BoxGeometry(3, 0.6, 1.2);
+            const chassis = new THREE.Mesh(chassisGeometry, material);
+            chassis.position.y = 0.6;
+            group.add(chassis);
+            
+            // 创建货箱
+            const containerGeometry = new THREE.BoxGeometry(2, 1, 1);
+            const container = new THREE.Mesh(containerGeometry, material);
+            container.position.set(-0.5, 1.8, 0);
+            group.add(container);
+            
+            // 创建车轮
+            const wheelMaterial = new THREE.MeshLambertMaterial({ color: 0x000000 });
+            const wheelGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.2);
+            
+            // 前轮（2个）
+            for (let i = 0; i < 2; i++) {
+                const xOffset = i === 0 ? -1.2 : 1.2;
+                const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+                wheel.position.set(xOffset, 0.3, 0.7);
+                wheel.rotation.z = Math.PI / 2;
+                group.add(wheel);
+                
+                const wheel2 = new THREE.Mesh(wheelGeometry, wheelMaterial);
+                wheel2.position.set(xOffset, 0.3, -0.7);
+                wheel2.rotation.z = Math.PI / 2;
+                group.add(wheel2);
+            }
+        }
+        
+        return group;
+    },
+    
+    /**
+     * 创建道路标记
+     * @param {THREE.Scene} scene 场景对象
+     * @param {Object} options 选项
+     * @returns {THREE.Mesh} 道路标记网格
+     */
+    createRoadMarking: function(scene, options = {}) {
+        const length = options.length || 10;
+        const width = options.width || 0.2;
+        const color = options.color || 0xffffff;
+        const position = options.position || { x: 0, y: 0.01, z: 0 };
+        
+        const geometry = new THREE.BoxGeometry(length, 0.01, width);
+        const material = new THREE.MeshBasicMaterial({ color: color });
+        const marking = new THREE.Mesh(geometry, material);
+        marking.position.set(position.x, position.y, position.z);
+        
+        return marking;
+    },
+    
+    /**
+     * 创建交通信号灯
+     * @param {THREE.Scene} scene 场景对象
+     * @param {Object} options 选项
+     * @returns {THREE.Group} 交通信号灯组
+     */
+    createTrafficLight: function(scene, options = {}) {
+        const group = new THREE.Group();
+        const position = options.position || { x: 0, y: 0, z: 0 };
+        
+        // 创建灯柱
+        const poleGeometry = new THREE.CylinderGeometry(0.1, 0.1, 4);
+        const poleMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
+        const pole = new THREE.Mesh(poleGeometry, poleMaterial);
+        pole.position.set(0, 2, 0);
+        group.add(pole);
+        
+        // 创建灯箱
+        const boxGeometry = new THREE.BoxGeometry(0.5, 1.5, 0.5);
+        const boxMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+        const box = new THREE.Mesh(boxGeometry, boxMaterial);
+        box.position.set(0.4, 3.2, 0);
+        group.add(box);
+        
+        // 创建红灯
+        const redLightGeometry = new THREE.CircleGeometry(0.15, 16);
+        const redLightMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+        const redLight = new THREE.Mesh(redLightGeometry, redLightMaterial);
+        redLight.position.set(0.95, 3.7, 0);
+        redLight.rotation.y = Math.PI / 2;
+        group.add(redLight);
+        
+        // 创建黄灯
+        const yellowLightGeometry = new THREE.CircleGeometry(0.15, 16);
+        const yellowLightMaterial = new THREE.MeshBasicMaterial({ color: 0x888800 });
+        const yellowLight = new THREE.Mesh(yellowLightGeometry, yellowLightMaterial);
+        yellowLight.position.set(0.95, 3.4, 0);
+        yellowLight.rotation.y = Math.PI / 2;
+        group.add(yellowLight);
+        
+        // 创建绿灯
+        const greenLightGeometry = new THREE.CircleGeometry(0.15, 16);
+        const greenLightMaterial = new THREE.MeshBasicMaterial({ color: 0x008800 });
+        const greenLight = new THREE.Mesh(greenLightGeometry, greenLightMaterial);
+        greenLight.position.set(0.95, 3.1, 0);
+        greenLight.rotation.y = Math.PI / 2;
+        group.add(greenLight);
+        
+        group.position.set(position.x, position.y, position.z);
+        
+        // 存储灯光引用以便控制
+        group.trafficLights = {
+            red: redLight,
+            yellow: yellowLight,
+            green: greenLight
+        };
+        
+        return group;
+    },
+    
+    /**
+     * 设置交通信号灯状态
+     * @param {THREE.Group} trafficLight 交通信号灯组
+     * @param {string} state 状态：'red', 'yellow', 'green'
+     */
+    setTrafficLightState: function(trafficLight, state) {
+        if (!trafficLight.trafficLights) return;
+        
+        // 先关闭所有灯
+        trafficLight.trafficLights.red.material.color.setHex(0x880000);
+        trafficLight.trafficLights.yellow.material.color.setHex(0x888800);
+        trafficLight.trafficLights.green.material.color.setHex(0x008800);
+        
+        // 打开指定灯
+        if (state === 'red') {
+            trafficLight.trafficLights.red.material.color.setHex(0xff0000);
+        } else if (state === 'yellow') {
+            trafficLight.trafficLights.yellow.material.color.setHex(0xffff00);
+        } else if (state === 'green') {
+            trafficLight.trafficLights.green.material.color.setHex(0x00ff00);
+        }
+    },
+    
+    /**
+     * 创建天空盒
+     * @param {THREE.Scene} scene 场景对象
+     * @returns {THREE.Mesh} 天空盒网格
+     */
+    createSkybox: function(scene) {
+        const geometry = new THREE.BoxGeometry(1000, 1000, 1000);
+        const material = new THREE.MeshBasicMaterial({
+            color: 0x87ceeb,
+            side: THREE.BackSide
+        });
+        const skybox = new THREE.Mesh(geometry, material);
+        
+        return skybox;
+    },
+    
+    /**
+     * 创建地面网格
+     * @param {THREE.Scene} scene 场景对象
+     * @param {number} size 网格大小
+     * @returns {THREE.GridHelper} 网格辅助对象
+     */
+    createGroundGrid: function(scene, size = 50) {
+        const gridHelper = new THREE.GridHelper(size, 20, 0xcccccc, 0xeeeeee);
+        return gridHelper;
+    },
+    
+    /**
+     * 检测两个对象是否碰撞
+     * @param {THREE.Object3D} obj1 第一个对象
+     * @param {THREE.Object3D} obj2 第二个对象
+     * @returns {boolean} 是否碰撞
+     */
+    checkCollision: function(obj1, obj2) {
+        // 创建包围盒
+        const box1 = new THREE.Box3().setFromObject(obj1);
+        const box2 = new THREE.Box3().setFromObject(obj2);
+        
+        // 检测碰撞
+        return box1.intersectsBox(box2);
+    },
+    
+    /**
+     * 计算车辆在事故中的损伤程度
+     * @param {number} speed1 第一辆车速度
+     * @param {number} speed2 第二辆车速度
+     * @param {string} collisionType 碰撞类型
+     * @returns {string} 损伤程度：'minor', 'moderate', 'severe'
+     */
+    calculateDamageLevel: function(speed1, speed2, collisionType) {
+        // 计算相对速度
+        const relativeSpeed = Math.abs(speed1 - speed2);
+        
+        // 根据相对速度和碰撞类型确定损伤程度
+        if (collisionType === 'head-on') {
+            // 正面碰撞更严重
+            if (relativeSpeed < 30) return 'minor';
+            else if (relativeSpeed < 60) return 'moderate';
+            else return 'severe';
+        } else if (collisionType === 'side-impact') {
+            // 侧面碰撞次之
+            if (relativeSpeed < 40) return 'minor';
+            else if (relativeSpeed < 70) return 'moderate';
+            else return 'severe';
+        } else {
+            // 追尾等其他碰撞
+            if (relativeSpeed < 50) return 'minor';
+            else if (relativeSpeed < 80) return 'moderate';
+            else return 'severe';
+        }
+    },
+    
+    /**
+     * 创建烟雾效果
+     * @param {THREE.Scene} scene 场景对象
+     * @param {Object} position 位置
+     * @returns {THREE.Points} 烟雾粒子
+     */
+    createSmokeEffect: function(scene, position = { x: 0, y: 0, z: 0 }) {
+        const particlesCount = 500;
+        const geometry = new THREE.BufferGeometry();
+        
+        const positions = new Float32Array(particlesCount * 3);
+        const colors = new Float32Array(particlesCount * 3);
+        
+        // 初始化粒子位置和颜色
+        for (let i = 0; i < particlesCount; i++) {
+            const i3 = i * 3;
+            
+            // 随机位置，集中在指定位置附近
+            positions[i3] = position.x + (Math.random() - 0.5) * 2;
+            positions[i3 + 1] = position.y + Math.random() * 3;
+            positions[i3 + 2] = position.z + (Math.random() - 0.5) * 2;
+            
+            // 烟雾颜色（白色到灰色）
+            const grayness = 0.7 + Math.random() * 0.3;
+            colors[i3] = grayness;
+            colors[i3 + 1] = grayness;
+            colors[i3 + 2] = grayness;
+        }
+        
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        
+        // 创建材质
+        const material = new THREE.PointsMaterial({
+            size: 0.1,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.8,
+            sizeAttenuation: true
+        });
+        
+        // 创建粒子系统
+        const particles = new THREE.Points(geometry, material);
+        
+        // 添加到场景
+        scene.add(particles);
+        
+        return particles;
+    },
+    
+    /**
+     * 更新烟雾效果动画
+     * @param {THREE.Points} particles 烟雾粒子
+     */
+    updateSmokeEffect: function(particles) {
+        if (!particles || !particles.geometry.attributes.position) return;
+        
+        const positions = particles.geometry.attributes.position.array;
+        
+        // 更新每个粒子的位置
+        for (let i = 0; i < positions.length; i += 3) {
+            // 向上飘动
+            positions[i + 1] += 0.01 * (Math.random() * 0.5 + 0.5);
+            
+            // 左右飘动
+            positions[i] += (Math.random() - 0.5) * 0.02;
+            positions[i + 2] += (Math.random() - 0.5) * 0.02;
+            
+            // 如果粒子飞得太高，重置到下方
+            if (positions[i + 1] > 5) {
+                positions[i + 1] = 0;
+            }
+        }
+        
+        // 标记位置属性需要更新
+        particles.geometry.attributes.position.needsUpdate = true;
+    },
+    
+    /**
+     * 从事故数据创建路径点
+     * @param {Object} accidentData 事故数据
+     * @returns {Array} 路径点数组
+     */
+    createPathFromAccidentData: function(accidentData) {
+        const pathPoints = [];
+        
+        // 根据事故类型生成路径点
+        if (accidentData.accidentType === 'rear-end') {
+            // 追尾事故：两辆车同向行驶
+            pathPoints.push([
+                { x: -10, z: 0 },
+                { x: -5, z: 0 },
+                { x: 0, z: 0 }
+            ]);
+            pathPoints.push([
+                { x: -15, z: -2 },
+                { x: -10, z: -2 },
+                { x: -5, z: -2 },
+                { x: 0, z: -2 }
+            ]);
+        } else if (accidentData.accidentType === 'head-on') {
+            // 正面碰撞：两辆车相向行驶
+            pathPoints.push([
+                { x: -10, z: 0 },
+                { x: -5, z: 0 },
+                { x: 0, z: 0 }
+            ]);
+            pathPoints.push([
+                { x: 10, z: 0 },
+                { x: 5, z: 0 },
+                { x: 0, z: 0 }
+            ]);
+        } else if (accidentData.accidentType === 'side-impact') {
+            // 侧面碰撞：十字路口碰撞
+            pathPoints.push([
+                { x: -10, z: 0 },
+                { x: -5, z: 0 },
+                { x: 0, z: 0 },
+                { x: 5, z: 0 }
+            ]);
+            pathPoints.push([
+                { x: 0, z: 10 },
+                { x: 0, z: 5 },
+                { x: 0, z: 0 },
+                { x: 0, z: -5 }
+            ]);
+        } else {
+            // 默认路径
+            pathPoints.push([
+                { x: -10, z: 1 },
+                { x: -5, z: 1 },
+                { x: 0, z: 1 }
+            ]);
+            pathPoints.push([
+                { x: -10, z: -1 },
+                { x: -5, z: -1 },
+                { x: 0, z: -1 }
+            ]);
+        }
+        
+        return pathPoints;
+    },
+    
+    /**
+     * 计算车辆运动轨迹
+     * @param {Array} pathPoints 路径点数组
+     * @param {number} speed 速度
+     * @param {number} totalTime 总时间
+     * @returns {Function} 接收时间参数，返回位置和旋转角度的函数
+     */
+    createMotionPath: function(pathPoints, speed, totalTime) {
+        return function(time) {
+            // 计算当前进度
+            const progress = (time % totalTime) / totalTime;
+            
+            // 计算应该在哪个路径段
+            const totalPoints = pathPoints.length;
+            const pointIndex = Math.min(Math.floor(progress * totalPoints), totalPoints - 2);
+            const segmentProgress = (progress * totalPoints) % 1;
+            
+            // 获取当前段的起点和终点
+            const startPoint = pathPoints[pointIndex];
+            const endPoint = pathPoints[pointIndex + 1];
+            
+            // 计算当前位置（线性插值）
+            const x = startPoint.x + (endPoint.x - startPoint.x) * segmentProgress;
+            const z = startPoint.z + (endPoint.z - startPoint.z) * segmentProgress;
+            
+            // 计算旋转角度（朝向移动方向）
+            const dx = endPoint.x - startPoint.x;
+            const dz = endPoint.z - startPoint.z;
+            const angle = Math.atan2(dz, dx);
+            
+            return {
+                position: { x, y: 0.5, z },
+                rotation: { y: angle }
+            };
+        };
+    }
+};
+
+/**
+ * 物理引擎简化版，用于模拟车辆运动和碰撞
+ */
+class PhysicsEngine {
+    constructor() {
+        this.gravity = 9.8;
+        this.friction = 0.02;
+        this.damping = 0.98;
+    }
+    
+    /**
+     * 更新物体位置
+     * @param {Object} object 物体对象
+     * @param {number} deltaTime 时间增量
+     */
+    updateObject(object, deltaTime) {
+        if (!object.velocity) {
+            object.velocity = { x: 0, y: 0, z: 0 };
+        }
+        
+        if (!object.acceleration) {
+            object.acceleration = { x: 0, y: 0, z: 0 };
+        }
+        
+        // 应用加速度
+        object.velocity.x += object.acceleration.x * deltaTime;
+        object.velocity.y += object.acceleration.y * deltaTime;
+        object.velocity.z += object.acceleration.z * deltaTime;
+        
+        // 应用摩擦和阻尼
+        object.velocity.x *= (1 - this.friction) * this.damping;
+        object.velocity.y *= (1 - this.friction) * this.damping;
+        object.velocity.z *= (1 - this.friction) * this.damping;
+        
+        // 更新位置
+        if (object.position) {
+            object.position.x += object.velocity.x * deltaTime;
+            object.position.y += object.velocity.y * deltaTime;
+            object.position.z += object.velocity.z * deltaTime;
+        }
+    }
+    
+    /**
+     * 处理碰撞反应
+     * @param {Object} obj1 第一个对象
+     * @param {Object} obj2 第二个对象
+     */
+    handleCollision(obj1, obj2) {
+        // 简单的弹性碰撞模拟
+        if (!obj1.velocity || !obj2.velocity) return;
+        
+        // 交换速度的x和z分量（简化处理）
+        const tempX = obj1.velocity.x;
+        const tempZ = obj1.velocity.z;
+        
+        obj1.velocity.x = obj2.velocity.x * 0.5; // 能量损失
+        obj1.velocity.z = obj2.velocity.z * 0.5;
+        
+        obj2.velocity.x = tempX * 0.5;
+        obj2.velocity.z = tempZ * 0.5;
+        
+        // 添加一些随机旋转效果
+        if (obj1.rotation) {
+            obj1.rotation.x += (Math.random() - 0.5) * 0.1;
+            obj1.rotation.z += (Math.random() - 0.5) * 0.1;
+        }
+        
+        if (obj2.rotation) {
+            obj2.rotation.x += (Math.random() - 0.5) * 0.1;
+            obj2.rotation.z += (Math.random() - 0.5) * 0.1;
+        }
+    }
+    
+    /**
+     * 应用刹车力
+     * @param {Object} object 物体对象
+     * @param {number} brakeForce 刹车力
+     */
+    applyBrakes(object, brakeForce) {
+        if (!object.velocity) return;
+        
+        const speed = Math.sqrt(object.velocity.x * object.velocity.x + object.velocity.z * object.velocity.z);
+        
+        if (speed > 0) {
+            // 计算反方向的刹车力
+            const brakeFactor = Math.min(brakeForce / speed, 1);
+            
+            object.velocity.x *= (1 - brakeFactor);
+            object.velocity.z *= (1 - brakeFactor);
+        }
+    }
+    
+    /**
+     * 应用引擎力
+     * @param {Object} object 物体对象
+     * @param {number} engineForce 引擎力
+     * @param {number} direction 方向（弧度）
+     */
+    applyEngineForce(object, engineForce, direction) {
+        if (!object.velocity) {
+            object.velocity = { x: 0, y: 0, z: 0 };
+        }
+        
+        if (!object.acceleration) {
+            object.acceleration = { x: 0, y: 0, z: 0 };
+        }
+        
+        // 应用引擎力在指定方向
+        object.acceleration.x = Math.cos(direction) * engineForce;
+        object.acceleration.z = Math.sin(direction) * engineForce;
+    }
+}
+
+/**
+ * 事故场景管理器，负责协调各种元素创建事故场景
+ */
+class AccidentSceneManager {
+    constructor(scene) {
+        this.scene = scene;
+        this.physicsEngine = new PhysicsEngine();
+        this.vehicles = [];
+        this.obstacles = [];
+        this.trafficLights = [];
+        this.smokeEffects = [];
+        this.cameraAnimations = [];
+        this.isSimulationRunning = false;
+    }
+    
+    /**
+     * 从事故数据创建完整场景
+     * @param {Object} accidentData 事故数据
+     */
+    createFromAccidentData(accidentData) {
+        // 清空现有场景
+        this.clear();
+        
+        // 创建道路
+        this.createRoad(accidentData);
+        
+        // 创建交通信号灯
+        if (accidentData.trafficSignals) {
+            this.createTrafficSignals(accidentData.trafficSignals);
+        }
+        
+        // 创建车辆
+        this.createVehicles(accidentData);
+        
+        // 根据天气条件调整场景
+        this.adjustForWeather(accidentData.weatherCondition);
+        
+        // 设置相机动画路径
+        this.setupCameraAnimation(accidentData);
+    }
+    
+    /**
+     * 创建道路
+     * @param {Object} accidentData 事故数据
+     */
+    createRoad(accidentData) {
+        // 根据事故类型创建不同的道路布局
+        if (accidentData.accidentType === 'rear-end' || accidentData.accidentType === 'head-on') {
+            // 直线路段
+            this.createStraightRoad();
+        } else if (accidentData.accidentType === 'side-impact') {
+            // 十字路口
+            this.createCrossRoad();
+        } else {
+            // 默认道路
+            this.createStraightRoad();
+        }
+    }
+    
+    /**
+     * 创建直线路段
+     */
+    createStraightRoad() {
+        // 创建主道路
+        const roadGeometry = new THREE.BoxGeometry(30, 0.1, 10);
+        const roadMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+        const road = new THREE.Mesh(roadGeometry, roadMaterial);
+        road.position.y = -0.05;
+        this.scene.add(road);
+        
+        // 添加道路标记
+        const centerMarking = SimulationUtils.createRoadMarking(this.scene, {
+            length: 28,
+            width: 0.2,
+            position: { x: 0, y: 0.01, z: 0 }
+        });
+        this.scene.add(centerMarking);
+        
+        // 添加边界线
+        const leftBorder = SimulationUtils.createRoadMarking(this.scene, {
+            length: 28,
+            width: 0.1,
+            position: { x: 0, y: 0.01, z: 4.95 },
+            color: 0xffffff
+        });
+        this.scene.add(leftBorder);
+        
+        const rightBorder = SimulationUtils.createRoadMarking(this.scene, {
+            length: 28,
+            width: 0.1,
+            position: { x: 0, y: 0.01, z: -4.95 },
+            color: 0xffffff
+        });
+        this.scene.add(rightBorder);
+    }
+    
+    /**
+     * 创建十字路口
+     */
+    createCrossRoad() {
+        // 创建水平道路
+        const horizontalRoadGeometry = new THREE.BoxGeometry(30, 0.1, 10);
+        const roadMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+        const horizontalRoad = new THREE.Mesh(horizontalRoadGeometry, roadMaterial);
+        horizontalRoad.position.y = -0.05;
+        this.scene.add(horizontalRoad);
+        
+        // 创建垂直道路
+        const verticalRoadGeometry = new THREE.BoxGeometry(10, 0.1, 30);
+        const verticalRoad = new THREE.Mesh(verticalRoadGeometry, roadMaterial);
+        verticalRoad.position.y = -0.05;
+        this.scene.add(verticalRoad);
+        
+        // 添加道路标记
+        const centerMarkingH = SimulationUtils.createRoadMarking(this.scene, {
+            length: 28,
+            width: 0.2,
+            position: { x: 0, y: 0.01, z: 0 }
+        });
+        this.scene.add(centerMarkingH);
+        
+        const centerMarkingV = SimulationUtils.createRoadMarking(this.scene, {
+            length: 28,
+            width: 0.2,
+            position: { x: 0, y: 0.01, z: 0 }
+        });
+        centerMarkingV.rotation.y = Math.PI / 2;
+        this.scene.add(centerMarkingV);
+        
+        // 添加停车线
+        const stopLine1 = SimulationUtils.createRoadMarking(this.scene, {
+            length: 9,
+            width: 0.2,
+            position: { x: -4.9, y: 0.01, z: 0 }
+        });
+        this.scene.add(stopLine1);
+        
+        const stopLine2 = SimulationUtils.createRoadMarking(this.scene, {
+            length: 9,
+            width: 0.2,
+            position: { x: 4.9, y: 0.01, z: 0 }
+        });
+        this.scene.add(stopLine2);
+        
+        const stopLine3 = SimulationUtils.createRoadMarking(this.scene, {
+            length: 9,
+            width: 0.2,
+            position: { x: 0, y: 0.01, z: -4.9 }
+        });
+        stopLine3.rotation.y = Math.PI / 2;
+        this.scene.add(stopLine3);
+        
+        const stopLine4 = SimulationUtils.createRoadMarking(this.scene, {
+            length: 9,
+            width: 0.2,
+            position: { x: 0, y: 0.01, z: 4.9 }
+        });
+        stopLine4.rotation.y = Math.PI / 2;
+        this.scene.add(stopLine4);
+    }
+    
+    /**
+     * 创建交通信号灯
+     * @param {string} signalState 信号状态
+     */
+    createTrafficSignals(signalState) {
+        // 在十字路口四个角添加信号灯
+        const positions = [
+            { x: 6, y: 0, z: 6 },
+            { x: 6, y: 0, z: -6 },
+            { x: -6, y: 0, z: 6 },
+            { x: -6, y: 0, z: -6 }
+        ];
+        
+        for (let i = 0; i < positions.length; i++) {
+            const trafficLight = SimulationUtils.createTrafficLight(this.scene, {
+                position: positions[i]
+            });
+            
+            // 根据位置设置信号灯状态
+            let state = 'red';
+            if (i < 2 && signalState === 'green-light') {
+                state = 'green';
+            } else if (i >= 2 && signalState === 'red-light') {
+                state = 'green';
+            }
+            
+            SimulationUtils.setTrafficLightState(trafficLight, state);
+            this.scene.add(trafficLight);
+            this.trafficLights.push(trafficLight);
+        }
+    }
+    
+    /**
+     * 创建车辆
+     * @param {Object} accidentData 事故数据
+     */
+    createVehicles(accidentData) {
+        // 创建两辆车
+        const car1 = SimulationUtils.createVehicleModel(this.scene, {
+            type: 'car',
+            color: 0xff0000
+        });
+        
+        const car2 = SimulationUtils.createVehicleModel(this.scene, {
+            type: 'car',
+            color: 0x0000ff
+        });
+        
+        // 根据事故类型设置车辆初始位置
+        if (accidentData.accidentType === 'rear-end') {
+            // 追尾：前车在前，后车在后
+            car1.position.set(-5, 0.5, 1);
+            car2.position.set(-15, 0.5, 1);
+            
+            // 设置车辆方向
+            car1.rotation.y = 0;
+            car2.rotation.y = 0;
+            
+            // 设置初始速度
+            car1.velocity = { x: 10, y: 0, z: 0 };
+            car2.velocity = { x: 20, y: 0, z: 0 }; // 后车速度更快
+        } else if (accidentData.accidentType === 'head-on') {
+            // 正面碰撞：相向而行
+            car1.position.set(-10, 0.5, 1);
+            car2.position.set(10, 0.5, 1);
+            
+            // 设置车辆方向
+            car1.rotation.y = 0;
+            car2.rotation.y = Math.PI;
+            
+            // 设置初始速度
+            car1.velocity = { x: 15, y: 0, z: 0 };
+            car2.velocity = { x: -15, y: 0, z: 0 };
+        } else if (accidentData.accidentType === 'side-impact') {
+            // 侧面碰撞：十字路口
+            car1.position.set(-10, 0.5, 0);
+            car2.position.set(0, 0.5, 10);
+            
+            // 设置车辆方向
+            car1.rotation.y = 0;
+            car2.rotation.y = -Math.PI / 2;
+            
+            // 设置初始速度
+            car1.velocity = { x: 15, y: 0, z: 0 };
+            car2.velocity = { x: 0, y: 0, z: -15 };
+        }
+        
+        // 添加到场景和车辆列表
+        this.scene.add(car1);
+        this.scene.add(car2);
+        this.vehicles.push(car1);
+        this.vehicles.push(car2);
+    }
+    
+    /**
+     * 根据天气条件调整场景
+     * @param {string} weatherCondition 天气条件
+     */
+    adjustForWeather(weatherCondition) {
+        // 创建天空盒
+        const skybox = SimulationUtils.createSkybox(this.scene);
+        
+        // 根据天气调整天空颜色
+        if (weatherCondition === 'rainy') {
+            skybox.material.color.setHex(0x4a5568);
+            this.addRainEffect();
+        } else if (weatherCondition === 'foggy') {
+            skybox.material.color.setHex(0xa0aec0);
+            this.addFogEffect();
+        } else if (weatherCondition === 'snowy') {
+            skybox.material.color.setHex(0xe2e8f0);
+            this.addSnowEffect();
+        } else {
+            // 晴天
+            skybox.material.color.setHex(0x87ceeb);
+        }
+        
+        this.scene.add(skybox);
+    }
+    
+    /**
+     * 添加雨效果
+     */
+    addRainEffect() {
+        // 这里可以添加雨粒子效果
+        console.log('添加雨效果');
+    }
+    
+    /**
+     * 添加雾效果
+     */
+    addFogEffect() {
+        // 添加场景雾
+        this.scene.fog = new THREE.Fog(0xa0aec0, 10, 50);
+    }
+    
+    /**
+     * 添加雪效果
+     */
+    addSnowEffect() {
+        // 这里可以添加雪粒子效果
+        console.log('添加雪效果');
+    }
+    
+    /**
+     * 设置相机动画
+     * @param {Object} accidentData 事故数据
+     */
+    setupCameraAnimation(accidentData) {
+        // 定义相机路径点
+        const cameraPath = [];
+        
+        if (accidentData.accidentType === 'rear-end') {
+            cameraPath.push(
+                { position: { x: 0, y: 20, z: 20 }, lookAt: { x: 0, y: 0, z: 0 } },
+                { position: { x: 0, y: 10, z: 0 }, lookAt: { x: 0, y: 0, z: 0 } },
+                { position: { x: -5, y: 5, z: 5 }, lookAt: { x: 0, y: 0, z: 0 } },
+                { position: { x: 0, y: 20, z: 20 }, lookAt: { x: 0, y: 0, z: 0 } }
+            );
+        } else {
+            cameraPath.push(
+                { position: { x: 0, y: 20, z: 20 }, lookAt: { x: 0, y: 0, z: 0 } },
+                { position: { x: 20, y: 20, z: 0 }, lookAt: { x: 0, y: 0, z: 0 } },
+                { position: { x: 0, y: 20, z: -20 }, lookAt: { x: 0, y: 0, z: 0 } },
+                { position: { x: -20, y: 20, z: 0 }, lookAt: { x: 0, y: 0, z: 0 } },
+                { position: { x: 0, y: 20, z: 20 }, lookAt: { x: 0, y: 0, z: 0 } }
+            );
+        }
+        
+        this.cameraAnimations = cameraPath;
+    }
+    
+    /**
+     * 更新相机动画
+     * @param {THREE.Camera} camera 相机对象
+     * @param {number} time 时间
+     */
+    updateCamera(camera, time) {
+        if (this.cameraAnimations.length === 0) return;
+        
+        // 计算动画进度
+        const totalTime = 10; // 10秒循环一次
+        const progress = (time % totalTime) / totalTime;
+        
+        // 计算当前动画段
+        const totalPoints = this.cameraAnimations.length;
+        const pointIndex = Math.min(Math.floor(progress * totalPoints), totalPoints - 2);
+        const segmentProgress = (progress * totalPoints) % 1;
+        
+        // 获取当前段的起点和终点
+        const startPoint = this.cameraAnimations[pointIndex];
+        const endPoint = this.cameraAnimations[pointIndex + 1];
+        
+        // 线性插值计算相机位置
+        camera.position.x = startPoint.position.x + (endPoint.position.x - startPoint.position.x) * segmentProgress;
+        camera.position.y = startPoint.position.y + (endPoint.position.y - startPoint.position.y) * segmentProgress;
+        camera.position.z = startPoint.position.z + (endPoint.position.z - startPoint.position.z) * segmentProgress;
+        
+        // 线性插值计算目标位置
+        const lookAtX = startPoint.lookAt.x + (endPoint.lookAt.x - startPoint.lookAt.x) * segmentProgress;
+        const lookAtY = startPoint.lookAt.y + (endPoint.lookAt.y - startPoint.lookAt.y) * segmentProgress;
+        const lookAtZ = startPoint.lookAt.z + (endPoint.lookAt.z - startPoint.lookAt.z) * segmentProgress;
+        
+        camera.lookAt(lookAtX, lookAtY, lookAtZ);
+    }
+    
+    /**
+     * 更新场景模拟
+     * @param {number} deltaTime 时间增量
+     * @param {number} totalTime 总时间
+     */
+    update(deltaTime, totalTime) {
+        if (!this.isSimulationRunning) return;
+        
+        // 更新每个车辆的物理状态
+        this.vehicles.forEach(vehicle => {
+            this.physicsEngine.updateObject(vehicle, deltaTime);
+        });
+        
+        // 检测车辆之间的碰撞
+        for (let i = 0; i < this.vehicles.length; i++) {
+            for (let j = i + 1; j < this.vehicles.length; j++) {
+                if (SimulationUtils.checkCollision(this.vehicles[i], this.vehicles[j])) {
+                    // 处理碰撞
+                    this.physicsEngine.handleCollision(this.vehicles[i], this.vehicles[j]);
+                    
+                    // 创建烟雾效果
+                    this.createSmokeAtCollision(this.vehicles[i], this.vehicles[j]);
+                }
+            }
+        }
+        
+        // 更新烟雾效果
+        this.smokeEffects.forEach(smoke => {
+            SimulationUtils.updateSmokeEffect(smoke);
+        });
+    }
+    
+    /**
+     * 在碰撞位置创建烟雾
+     * @param {Object} obj1 第一个对象
+     * @param {Object} obj2 第二个对象
+     */
+    createSmokeAtCollision(obj1, obj2) {
+        // 计算碰撞位置（两个物体的中点）
+        const collisionX = (obj1.position.x + obj2.position.x) / 2;
+        const collisionY = Math.max(obj1.position.y, obj2.position.y);
+        const collisionZ = (obj1.position.z + obj2.position.z) / 2;
+        
+        // 创建烟雾效果
+        const smoke = SimulationUtils.createSmokeEffect(this.scene, {
+            x: collisionX,
+            y: collisionY,
+            z: collisionZ
+        });
+        
+        this.smokeEffects.push(smoke);
+    }
+    
+    /**
+     * 开始模拟
+     */
+    startSimulation() {
+        this.isSimulationRunning = true;
+    }
+    
+    /**
+     * 暂停模拟
+     */
+    pauseSimulation() {
+        this.isSimulationRunning = false;
+    }
+    
+    /**
+     * 重置模拟
+     */
+    resetSimulation() {
+        this.isSimulationRunning = false;
+        this.clear();
+    }
+    
+    /**
+     * 清空场景元素
+     */
+    clear() {
+        // 移除所有车辆
+        this.vehicles.forEach(vehicle => {
+            if (this.scene.getObjectById(vehicle.id)) {
+                this.scene.remove(vehicle);
+            }
+        });
+        this.vehicles = [];
+        
+        // 移除所有障碍物
+        this.obstacles.forEach(obstacle => {
+            if (this.scene.getObjectById(obstacle.id)) {
+                this.scene.remove(obstacle);
+            }
+        });
+        this.obstacles = [];
+        
+        // 移除所有交通信号灯
+        this.trafficLights.forEach(light => {
+            if (this.scene.getObjectById(light.id)) {
+                this.scene.remove(light);
+            }
+        });
+        this.trafficLights = [];
+        
+        // 移除所有烟雾效果
+        this.smokeEffects.forEach(smoke => {
+            if (this.scene.getObjectById(smoke.id)) {
+                this.scene.remove(smoke);
+            }
+        });
+        this.smokeEffects = [];
+        
+        // 移除天空盒
+        const skybox = this.scene.getObjectByName('skybox');
+        if (skybox) {
+            this.scene.remove(skybox);
+        }
+        
+        // 移除道路
+        const roads = this.scene.children.filter(child => 
+            child.userData && child.userData.type === 'road'
+        );
+        roads.forEach(road => {
+            this.scene.remove(road);
+        });
+        
+        // 清除雾
+        this.scene.fog = null;
+    }
+}
+
+// 导出模块
+export { SimulationUtils, PhysicsEngine, AccidentSceneManager };

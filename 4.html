@@ -1,0 +1,591 @@
+// 交通事故责任判定平台 - 界面交互逻辑
+
+class InterfaceInteraction {
+    constructor() {
+        this.initializeEventListeners();
+        this.setupFormValidation();
+        this.initResponsiveBehavior();
+        this.setupAnimations();
+    }
+
+    // 初始化所有事件监听器
+    initializeEventListeners() {
+        // 表单提交事件
+        const accidentForm = document.getElementById('accident-form');
+        if (accidentForm) {
+            accidentForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleFormSubmission();
+            });
+        }
+
+        // 模拟控制按钮事件
+        const simulationBtn = document.getElementById('start-simulation');
+        const pauseBtn = document.getElementById('pause-simulation');
+        const resetBtn = document.getElementById('reset-simulation');
+        const speedUpBtn = document.getElementById('speed-up');
+        const slowDownBtn = document.getElementById('slow-down');
+
+        if (simulationBtn) simulationBtn.addEventListener('click', () => this.handleSimulationStart());
+        if (pauseBtn) pauseBtn.addEventListener('click', () => this.handleSimulationPause());
+        if (resetBtn) resetBtn.addEventListener('click', () => this.handleSimulationReset());
+        if (speedUpBtn) speedUpBtn.addEventListener('click', () => this.handleSpeedUp());
+        if (slowDownBtn) slowDownBtn.addEventListener('click', () => this.handleSlowDown());
+
+        // 场景控制按钮事件
+        const rotateBtn = document.getElementById('toggle-rotation');
+        const zoomInBtn = document.getElementById('zoom-in');
+        const zoomOutBtn = document.getElementById('zoom-out');
+        const resetViewBtn = document.getElementById('reset-view');
+
+        if (rotateBtn) rotateBtn.addEventListener('click', () => this.toggleRotation());
+        if (zoomInBtn) zoomInBtn.addEventListener('click', () => this.zoomIn());
+        if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => this.zoomOut());
+        if (resetViewBtn) resetViewBtn.addEventListener('click', () => this.resetView());
+
+        // 事故类型变化时的处理
+        const accidentType = document.getElementById('accident-type');
+        if (accidentType) {
+            accidentType.addEventListener('change', () => this.adjustFormFields());
+        }
+
+        // 碰撞细节文本区域字数统计
+        const detailsTextarea = document.getElementById('collision-details');
+        if (detailsTextarea) {
+            detailsTextarea.addEventListener('input', () => this.updateCharCount());
+        }
+
+        // 添加滚动动画监听
+        this.setupScrollAnimations();
+    }
+
+    // 设置表单验证
+    setupFormValidation() {
+        const formGroups = document.querySelectorAll('.form-group');
+        formGroups.forEach(group => {
+            const input = group.querySelector('input, select, textarea');
+            if (input && input.required) {
+                input.addEventListener('blur', () => {
+                    this.validateField(input);
+                });
+            }
+        });
+    }
+
+    // 验证单个表单字段
+    validateField(input) {
+        const formGroup = input.closest('.form-group');
+        const errorElement = formGroup.querySelector('.error-message');
+        
+        if (!input.value.trim()) {
+            if (!errorElement) {
+                const errorMsg = document.createElement('div');
+                errorMsg.className = 'error-message';
+                errorMsg.textContent = '此字段为必填项';
+                errorMsg.style.color = '#e74c3c';
+                errorMsg.style.fontSize = '14px';
+                errorMsg.style.marginTop = '5px';
+                formGroup.appendChild(errorMsg);
+            }
+            input.style.borderColor = '#e74c3c';
+            return false;
+        } else {
+            if (errorElement) {
+                formGroup.removeChild(errorElement);
+            }
+            input.style.borderColor = '#e1e8ed';
+            return true;
+        }
+    }
+
+    // 处理表单提交
+    handleFormSubmission() {
+        // 验证所有必填字段
+        const requiredFields = document.querySelectorAll('input[required], select[required], textarea[required]');
+        let isValid = true;
+
+        requiredFields.forEach(field => {
+            if (!this.validateField(field)) {
+                isValid = false;
+            }
+        });
+
+        if (!isValid) {
+            // 显示错误提示
+            this.showNotification('请填写所有必填字段', 'error');
+            return;
+        }
+
+        // 显示加载状态
+        this.showLoadingState(true);
+
+        // 模拟数据处理延迟
+        setTimeout(() => {
+            // 收集表单数据
+            const formData = this.collectFormData();
+            
+            // 隐藏加载状态
+            this.showLoadingState(false);
+            
+            // 隐藏加载占位符并触发3D场景渲染
+            this.hideLoadingPlaceholder();
+            
+            // 模拟触发分析和场景渲染
+            if (window.accidentAnalysis) {
+                window.accidentAnalysis.analyzeAccident(formData);
+            }
+            
+            // 显示成功通知
+            this.showNotification('事故分析已开始', 'success');
+        }, 1500);
+    }
+
+    // 收集表单数据
+    collectFormData() {
+        const formData = {
+            accidentType: document.getElementById('accident-type')?.value,
+            location: document.getElementById('accident-location')?.value,
+            time: document.getElementById('accident-time')?.value,
+            weather: document.getElementById('weather-condition')?.value,
+            speed1: document.getElementById('vehicle1-speed')?.value,
+            speed2: document.getElementById('vehicle2-speed')?.value,
+            trafficLight: document.getElementById('traffic-light')?.value,
+            driverCondition1: document.getElementById('driver1-condition')?.value,
+            driverCondition2: document.getElementById('driver2-condition')?.value,
+            roadCondition: document.getElementById('road-condition')?.value,
+            collisionDetails: document.getElementById('collision-details')?.value,
+            witnessInfo: document.getElementById('witness-info')?.value
+        };
+        return formData;
+    }
+
+    // 处理模拟控制
+    handleSimulationStart() {
+        this.updateButtonState('start-simulation', true);
+        this.updateButtonState('pause-simulation', false);
+        this.showNotification('事故模拟已开始', 'info');
+        
+        if (window.accidentSimulation) {
+            window.accidentSimulation.startSimulation();
+        }
+    }
+
+    handleSimulationPause() {
+        this.updateButtonState('start-simulation', false);
+        this.updateButtonState('pause-simulation', true);
+        this.showNotification('事故模拟已暂停', 'info');
+        
+        if (window.accidentSimulation) {
+            window.accidentSimulation.pauseSimulation();
+        }
+    }
+
+    handleSimulationReset() {
+        this.updateButtonState('start-simulation', false);
+        this.updateButtonState('pause-simulation', false);
+        this.showNotification('事故模拟已重置', 'info');
+        
+        if (window.accidentSimulation) {
+            window.accidentSimulation.resetSimulation();
+        }
+    }
+
+    handleSpeedUp() {
+        this.showNotification('模拟速度已加快', 'info');
+        
+        if (window.accidentSimulation) {
+            window.accidentSimulation.adjustSpeed(1.5);
+        }
+    }
+
+    handleSlowDown() {
+        this.showNotification('模拟速度已减慢', 'info');
+        
+        if (window.accidentSimulation) {
+            window.accidentSimulation.adjustSpeed(0.5);
+        }
+    }
+
+    // 场景控制功能
+    toggleRotation() {
+        const btn = document.getElementById('toggle-rotation');
+        btn.classList.toggle('active');
+        
+        if (window.accidentSimulation) {
+            window.accidentSimulation.toggleAutoRotate();
+        }
+    }
+
+    zoomIn() {
+        if (window.accidentSimulation) {
+            window.accidentSimulation.zoomIn();
+        }
+    }
+
+    zoomOut() {
+        if (window.accidentSimulation) {
+            window.accidentSimulation.zoomOut();
+        }
+    }
+
+    resetView() {
+        if (window.accidentSimulation) {
+            window.accidentSimulation.resetCamera();
+        }
+    }
+
+    // 根据事故类型调整表单字段
+    adjustFormFields() {
+        const accidentType = document.getElementById('accident-type')?.value;
+        const pedestrianFields = document.querySelectorAll('.pedestrian-field');
+        const vehicle2Fields = document.querySelectorAll('.vehicle2-field');
+
+        pedestrianFields.forEach(field => {
+            field.style.display = (accidentType === 'pedestrian') ? 'block' : 'none';
+        });
+
+        vehicle2Fields.forEach(field => {
+            field.style.display = (accidentType === 'single-vehicle') ? 'none' : 'block';
+        });
+    }
+
+    // 更新字符计数
+    updateCharCount() {
+        const textarea = document.getElementById('collision-details');
+        if (textarea) {
+            const maxLength = parseInt(textarea.getAttribute('maxlength') || '500');
+            const currentLength = textarea.value.length;
+            
+            let counterElement = document.getElementById('char-counter');
+            if (!counterElement) {
+                counterElement = document.createElement('div');
+                counterElement.id = 'char-counter';
+                counterElement.style.fontSize = '12px';
+                counterElement.style.textAlign = 'right';
+                counterElement.style.marginTop = '5px';
+                textarea.parentNode.appendChild(counterElement);
+            }
+            
+            counterElement.textContent = `${currentLength}/${maxLength}`;
+            counterElement.style.color = currentLength > maxLength * 0.8 ? '#e74c3c' : '#7f8c8d';
+        }
+    }
+
+    // 显示通知
+    showNotification(message, type = 'info') {
+        // 移除旧的通知
+        const oldNotification = document.querySelector('.notification');
+        if (oldNotification) {
+            oldNotification.remove();
+        }
+
+        // 创建新通知
+        const notification = document.createElement('div');
+        notification.className = `notification fade-in`;
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.padding = '15px 20px';
+        notification.style.borderRadius = '8px';
+        notification.style.zIndex = '10000';
+        notification.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+        notification.style.fontSize = '14px';
+        notification.style.fontWeight = '500';
+        notification.style.display = 'flex';
+        notification.style.alignItems = 'center';
+        notification.style.gap = '10px';
+
+        // 设置通知样式
+        let icon = 'info-circle';
+        switch (type) {
+            case 'success':
+                notification.style.backgroundColor = '#27ae60';
+                notification.style.color = 'white';
+                icon = 'check-circle';
+                break;
+            case 'error':
+                notification.style.backgroundColor = '#e74c3c';
+                notification.style.color = 'white';
+                icon = 'times-circle';
+                break;
+            case 'warning':
+                notification.style.backgroundColor = '#f39c12';
+                notification.style.color = 'white';
+                icon = 'exclamation-circle';
+                break;
+            default:
+                notification.style.backgroundColor = '#3498db';
+                notification.style.color = 'white';
+        }
+
+        // 添加图标和文本
+        notification.innerHTML = `<i class="fas fa-${icon}"></i> ${message}`;
+        
+        // 添加到文档
+        document.body.appendChild(notification);
+
+        // 自动关闭
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            notification.style.transition = 'opacity 0.5s ease';
+            setTimeout(() => {
+                notification.remove();
+            }, 500);
+        }, 3000);
+    }
+
+    // 显示/隐藏加载状态
+    showLoadingState(show) {
+        const analyzeBtn = document.querySelector('button[type="submit"]');
+        if (analyzeBtn) {
+            if (show) {
+                analyzeBtn.disabled = true;
+                analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 分析中...';
+                analyzeBtn.classList.add('loading');
+            } else {
+                analyzeBtn.disabled = false;
+                analyzeBtn.innerHTML = '<i class="fas fa-search"></i> 分析事故';
+                analyzeBtn.classList.remove('loading');
+            }
+        }
+    }
+
+    // 更新按钮状态
+    updateButtonState(buttonId, disabled) {
+        const button = document.getElementById(buttonId);
+        if (button) {
+            button.disabled = disabled;
+        }
+    }
+
+    // 隐藏加载占位符
+    hideLoadingPlaceholder() {
+        const placeholder = document.getElementById('loading-placeholder');
+        if (placeholder) {
+            placeholder.style.opacity = '0';
+            placeholder.style.transition = 'opacity 0.5s ease';
+            setTimeout(() => {
+                placeholder.style.display = 'none';
+            }, 500);
+        }
+    }
+
+    // 初始化响应式行为
+    initResponsiveBehavior() {
+        // 初始调整
+        this.adjustFormFields();
+        
+        // 监听窗口大小变化
+        window.addEventListener('resize', () => {
+            this.handleResponsiveResize();
+        });
+        
+        // 初始处理
+        this.handleResponsiveResize();
+    }
+
+    // 处理响应式调整
+    handleResponsiveResize() {
+        const width = window.innerWidth;
+        const sceneControls = document.querySelector('.scene-controls');
+        
+        if (width < 768 && sceneControls) {
+            // 移动端布局调整
+            sceneControls.style.top = 'auto';
+            sceneControls.style.bottom = '10px';
+            sceneControls.style.right = '10px';
+        } else if (sceneControls) {
+            // 桌面端布局调整
+            sceneControls.style.top = '15px';
+            sceneControls.style.bottom = 'auto';
+        }
+    }
+
+    // 设置动画
+    setupAnimations() {
+        // 添加渐入动画类到各部分
+        const sections = document.querySelectorAll('.main-section, .sidebar');
+        sections.forEach((section, index) => {
+            setTimeout(() => {
+                section.classList.add('fade-in');
+            }, 100 * index);
+        });
+    }
+
+    // 设置滚动动画
+    setupScrollAnimations() {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('fade-in');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, {
+            threshold: 0.1
+        });
+
+        // 观察需要滚动动画的元素
+        const animatedElements = document.querySelectorAll('.results-section, .chart-container');
+        animatedElements.forEach(element => {
+            observer.observe(element);
+        });
+    }
+
+    // 显示分析结果
+    displayResults(results) {
+        const resultsSection = document.querySelector('.results-section');
+        if (!resultsSection) return;
+
+        // 清空现有结果
+        while (resultsSection.firstChild) {
+            resultsSection.removeChild(resultsSection.firstChild);
+        }
+
+        // 创建结果标题
+        const resultsTitle = document.createElement('h3');
+        resultsTitle.className = 'results-title';
+        resultsTitle.innerHTML = '<i class="fas fa-chart-pie"></i> 责任判定结果';
+        resultsSection.appendChild(resultsTitle);
+
+        // 主要责任方结果
+        const primaryLiability = document.createElement('div');
+        primaryLiability.className = 'result-item priority-high';
+        primaryLiability.innerHTML = `
+            <div class="result-label">主要责任方</div>
+            <div class="result-value">${results.primaryLiability || '车辆A'}</div>
+        `;
+        resultsSection.appendChild(primaryLiability);
+
+        // 责任比例结果
+        const liabilityPercentages = document.createElement('div');
+        liabilityPercentages.className = 'result-item';
+        liabilityPercentages.innerHTML = `
+            <div class="result-label">责任比例</div>
+            <div class="result-value">${results.liabilityPercentages || '车辆A: 70%, 车辆B: 30%'}</div>
+        `;
+        resultsSection.appendChild(liabilityPercentages);
+
+        // 判定理由
+        const reasons = document.createElement('div');
+        reasons.className = 'result-item';
+        reasons.innerHTML = `
+            <div class="result-label">判定理由</div>
+            <div class="result-value">${results.reasons || '基于交通规则和事故现场分析，主要责任方违反了让行规定。'}</div>
+        `;
+        resultsSection.appendChild(reasons);
+
+        // 违规行为
+        if (results.violations) {
+            const violations = document.createElement('div');
+            violations.className = 'result-item priority-medium';
+            violations.innerHTML = `
+                <div class="result-label">违规行为</div>
+                <div class="result-value">${results.violations}</div>
+            `;
+            resultsSection.appendChild(violations);
+        }
+
+        // 添加图表容器
+        if (!document.querySelector('.chart-container')) {
+            const chartContainer = document.createElement('div');
+            chartContainer.className = 'chart-container';
+            chartContainer.id = 'liability-chart';
+            resultsSection.appendChild(chartContainer);
+        }
+
+        // 触发图表渲染
+        this.renderLiabilityChart(results.chartData || this.getDefaultChartData());
+
+        // 添加动画效果
+        resultsSection.classList.add('fade-in');
+    }
+
+    // 渲染责任比例图表
+    renderLiabilityChart(data) {
+        const ctx = document.getElementById('liability-chart');
+        if (!ctx) return;
+
+        // 销毁现有图表
+        if (this.liabilityChart) {
+            this.liabilityChart.destroy();
+        }
+
+        // 创建新图表
+        this.liabilityChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: data.labels || ['车辆A责任', '车辆B责任'],
+                datasets: [{
+                    data: data.values || [70, 30],
+                    backgroundColor: [
+                        '#e74c3c',
+                        '#3498db'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: {
+                                size: 14
+                            },
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.label}: ${context.raw}%`;
+                            }
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: '责任比例分布',
+                        font: {
+                            size: 16,
+                            weight: 'bold'
+                        },
+                        padding: 20
+                    }
+                },
+                animation: {
+                    animateScale: true,
+                    animateRotate: true,
+                    duration: 1000,
+                    easing: 'easeOutBounce'
+                }
+            }
+        });
+    }
+
+    // 获取默认图表数据
+    getDefaultChartData() {
+        return {
+            labels: ['车辆A责任', '车辆B责任'],
+            values: [70, 30]
+        };
+    }
+}
+
+// 当文档加载完成时初始化交互
+document.addEventListener('DOMContentLoaded', () => {
+    // 确保所有脚本都已加载
+    setTimeout(() => {
+        window.interfaceInteraction = new InterfaceInteraction();
+        
+        // 为外部调用提供接口
+        window.displayAccidentResults = (results) => {
+            if (window.interfaceInteraction) {
+                window.interfaceInteraction.displayResults(results);
+            }
+        };
+    }, 500);
+});
